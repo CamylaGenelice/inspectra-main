@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -64,28 +64,33 @@
 
 
         <!-- Envio de Dados -->
-        <div class="card mb-4" id="envio">
-            <div class="card-header bg-success text-white">Envio de Dados</div>
-            <div class="card-body">
-                <form id="upload-form" action="/object-detection/" method="post" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="image" class="form-label">Selecione uma Imagem:</label>
-                        <input class="form-control" type="file" id="image" name="image" accept="image/*" required>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Enviar e Aplicar Detecção</button>
-                    </div>
-                </form>
-                <h5 class="text-center mt-3">Imagem Processada:</h5>
-                <img id="output-image" src="" alt="Imagem Processada" class="img-fluid mb-3 d-none">
-                <div class="d-grid">
-                    <a id="download-link" href="" download="output.png" class="btn btn-success d-none">Baixar Imagem</a>
-                </div>
-                <div id="message" class="alert mt-3 d-none"></div>
+        <!-- Envio de Dados -->
+<div class="card mb-4" id="envio">
+    <div class="card-header bg-success text-white">Envio de Dados</div>
+    <div class="card-body">
+        <form id="upload-form" action="/object-detection/" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="image" class="form-label">Selecione uma Imagem:</label>
+                <input type="file" class="form-control" id="image" name="image" accept="image/*" required>
             </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Enviar e Aplicar Detecção</button>
+            </div>
+        </form>
 
-            
+        <h5 class="text-center mt-3">Imagem Processada:</h5>
+        <img id="output-image" src="" alt="Imagem Processada" class="img-fluid mb-3 d-none">
+        <div class="d-grid">
+            <a id="download-link" href="" download="output.png" class="btn btn-success d-none">Baixar Imagem</a>
         </div>
+        <div id="message" class="alert mt-3 d-none"></div>
+    </div>
+</div>
+
+<!-- Script de envio de dados -->
+<script>
+    
+</script>
         
             <p  class="mb-0">Inspectra © 2025 - Todos os direitos reservados</p>
         
@@ -101,14 +106,18 @@
     <script>
         // Função para buscar os dados da API
         async function fetchProductData() {
-            try {
-                const response = await fetch('/api-info'); // Rota da API
-                const products = await response.json();
-    
-                // Atualiza a tabela
-                const tableBody = document.querySelector('#productTable tbody');
+        try {
+            const response = await fetch('/api-info'); // Rota da API
+            if (!response.ok) {
+                throw new Error(`Erro na requisição: ${response.statusText}`);
+            }
+            const products = await response.json();
+
+            // Atualiza a tabela
+            const tableBody = document.querySelector('#productTable tbody');
+            if (tableBody) {
                 tableBody.innerHTML = ''; // Limpa a tabela
-    
+
                 products.forEach(product => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
@@ -120,20 +129,23 @@
                     `;
                     tableBody.appendChild(row);
                 });
-    
-                // Atualiza o gráfico
-                updateChart(products);
-            } catch (error) {
-                console.error('Erro ao buscar dados:', error);
             }
-        }
-    
-        // Função para atualizar o gráfico
+
+        // Atualiza o gráfico
+        updateChart(products);
+    } 
+    catch (error) {
+        console.error('Erro ao buscar dados:', error);
+    }
+}
+
         function updateChart(products) {
+            const ctx = document.getElementById('inspectionChart');
+            if (!ctx) return;
+
             const approvedCount = products.filter(p => p.status === 'intacto').length;
             const rejectedCount = products.filter(p => p.status === 'defeito').length;
-    
-            const ctx = document.getElementById('inspectionChart').getContext('2d');
+
             if (window.inspectionChart) {
                 // Se o gráfico já existe, atualize os dados
                 window.inspectionChart.data.datasets[0].data = [approvedCount, rejectedCount];
@@ -165,11 +177,59 @@
                 });
             }
         }
-    
+
+        document.getElementById('upload-form').onsubmit = async function(event) {
+            event.preventDefault();
+
+            const fileInput = document.getElementById('image');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Por favor, selecione uma imagem antes de enviar.');
+                return;
+            }
+
+            const messageDiv = document.getElementById('message');
+            messageDiv.style.display = 'none';
+
+            const formData = new FormData(event.target);
+            try {
+                const response = await fetch('/object-detection', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+
+                    const outputImage = document.getElementById('output-image');
+                    outputImage.src = url;
+                    outputImage.style.display = 'block';
+
+                    const downloadLink = document.getElementById('download-link');
+                    downloadLink.href = url;
+                    downloadLink.style.display = 'block';
+
+                    messageDiv.textContent = 'Imagem processada com sucesso!';
+                    messageDiv.style.backgroundColor = '#4CAF50';
+                    messageDiv.style.display = 'block';
+                } else {
+                    const error = await response.text();
+                    messageDiv.textContent = `Erro: ${error}`;
+                    messageDiv.style.backgroundColor = '#f44336';
+                    messageDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Erro ao enviar a imagem:', error);
+                messageDiv.textContent = 'Erro ao processar a imagem.';
+                messageDiv.style.backgroundColor = '#f44336';
+                messageDiv.style.display = 'block';
+            }
+        };
+
         // Busca os dados quando a página carrega
         document.addEventListener('DOMContentLoaded', fetchProductData);
-    
-        // Atualiza os dados a cada 5 segundos
+
+        // Atualiza os dados a cada 10 segundos
         setInterval(fetchProductData, 10000);
     </script>
 

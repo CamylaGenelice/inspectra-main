@@ -11,6 +11,7 @@ import logging
 from pymongo import MongoClient
 from bson.json_util import dumps
 from flask_cors import CORS
+from bson import ObjectId
 
 app = Flask(__name__)
 CORS(app)
@@ -212,10 +213,18 @@ def video_feed():
 def get_inspection_data():
     try:
         # Consultar os dados no MongoDB
-        inspections = list(collection.find({}, {'_id': 0}))  # Exclui o campo _id do resultado
+        inspections = list(collection.find({}))  # Remove {'_id': 0}
+        logger.info(f"Dados encontrados: {len(inspections)} registros")
+
+        # Formatar os dados para JSON
+        for inspection in inspections:
+            inspection['_id'] = str(inspection['_id'])  # Converte ObjectId para string
+            inspection['timestamp'] = inspection['timestamp'].isoformat()  # Converte datetime para string ISO
+
         return dumps(inspections), 200  # Retorna os dados em formato JSON
     
     except Exception as e:
+        logger.error(f"Erro ao buscar dados: {str(e)}")
         return f"Erro ao buscar dados: {str(e)}", 500
 
 
