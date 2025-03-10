@@ -12,6 +12,7 @@ from pymongo import MongoClient
 from bson.json_util import dumps
 from flask_cors import CORS
 from bson import ObjectId
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -107,6 +108,7 @@ def index():
 
 
 @app.route('/object-detection/', methods=['POST'])
+
 def apply_detection():
     print("Requisição recebida em /object-detection")  # Log para depuração
     if 'image' not in request.files:
@@ -142,14 +144,20 @@ def apply_detection():
                     elif class_name == "Danificado":
                         damaged_count += 1
 
+                    # Converter a imagem para base64
+                    with open(file_path, 'rb') as image_file:
+                        image_base64 = base64.b64encode(image_file.read()).decode('utf-8')
+
                     # Salvar cada objeto detectado no MongoDB
                     detection_data = {
                         "filename": filename,
                         "detected_object": class_name,
                         "confidence": confidence,
                         "timestamp": datetime.now(),
-                        "status": "intacto" if class_name == "Intacto" else "defeito"
+                        "status": "intacto" if class_name == "Intacto" else "defeito",
+                        "image": image_base64
                     }
+                    
                     collection.insert_one(detection_data)
 
             # Converter a imagem processada para PNG
@@ -169,11 +177,33 @@ def apply_detection():
             if 'file_path' in locals() and os.path.exists(file_path):
                 os.remove(file_path)
             return f"Erro interno: {str(e)}", 500
+  
+             
     
 @app.route('/video')
 def index_video():
     return render_template('video.html')
 
+@app.route('/file-image/<filename>', methods =['GET'])
+def get_image(filename):    
+    try:
+        print(f"Buscando imagem com filename: {filename}")  # Log para depuração
+        inspection = collection.find_one({"filename": filename})
+        if inspection:
+            print("Documento encontrado:", inspection)  # Log para depuração
+            if 'image' in inspection:
+                print("Campo 'image' encontrado no documento")  # Log para depuração
+                image_data = base64.b64decode(inspection['image'])  # Decodifica a imagem base64
+                return Response(image_data, mimetype='image/png')  # Retorna a imagem como resposta
+            else:
+                print("Campo 'image' não encontrado no documento")  # Log para depuração
+                return "Campo 'image' não encontrado no documento", 404
+        else:
+            print("Documento não encontrado no MongoDB")  # Log para depuração
+            return "Imagem não encontrada", 404
+    except Exception as e:
+        print(f"Erro ao buscar imagem: {str(e)}")  # Log para depuração
+        return f"Erro interno: {str(e)}", 500
 
 def gen_frames():
     cap = cv2.VideoCapture(0)  # Use 0 para a câmera padrão
